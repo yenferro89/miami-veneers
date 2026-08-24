@@ -25,14 +25,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Glass without backdrop-filter.
-
-   backdrop-filter re-reads and re-blurs everything behind it every frame, and
-   behind this nav is a continuously animating WebGL canvas — a permanent cost
-   that also destabilises compositing (the click flicker). The hero is already
-   smooth and low-frequency, so blurring it changes almost nothing visually.
-   What actually reads as glass is a tint, a lit top edge, and depth. */
+/* Frosted glass: real backdrop blur, plus a tint, a lit top edge and depth. */
 .glass-surface {
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
   background-image:
     linear-gradient(
       180deg,

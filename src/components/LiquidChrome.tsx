@@ -151,12 +151,17 @@ export function LiquidChrome({
     window.addEventListener('resize', resize)
     resize()
 
+    // uMouse feeds the distortion loop, not just the ripple, shifting the whole
+    // field's phase by up to PI. Assigning it straight from the event (as
+    // upstream does) makes any cursor jump snap the background to a different
+    // state. Track a target and ease toward it instead.
+    const mouseTarget = new Float32Array([0, 0])
+
     function setMouseFromPoint(clientX: number, clientY: number) {
       if (!container) return
       const rect = container.getBoundingClientRect()
-      const mouse = program.uniforms.uMouse.value as Float32Array
-      mouse[0] = (clientX - rect.left) / rect.width
-      mouse[1] = 1 - (clientY - rect.top) / rect.height
+      mouseTarget[0] = (clientX - rect.left) / rect.width
+      mouseTarget[1] = 1 - (clientY - rect.top) / rect.height
     }
 
     function handleMouseMove(event: MouseEvent) {
@@ -189,6 +194,11 @@ export function LiquidChrome({
       if (lastFrame !== 0) elapsed += t - lastFrame
       lastFrame = t
       program.uniforms.uTime.value = elapsed * 0.001 * speed
+
+      const mouse = program.uniforms.uMouse.value as Float32Array
+      mouse[0] += (mouseTarget[0] - mouse[0]) * 0.04
+      mouse[1] += (mouseTarget[1] - mouse[1]) * 0.04
+
       renderer.render({ scene: mesh })
     }
 
@@ -211,27 +221,15 @@ export function LiquidChrome({
       cancelAnimationFrame(animationId)
     }
 
-    // Paint one frame up front so the canvas is never blank while paused.
-    renderer.render({ scene: mesh })
-
-    const observer = new IntersectionObserver(
-      ([entry]) => (entry.isIntersecting && !document.hidden ? start() : stop()),
-      { threshold: 0 },
-    )
-    observer.observe(container)
-
-    function handleVisibility() {
-      if (document.hidden) stop()
-      else start()
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
+    // No manual pausing. Browsers already throttle requestAnimationFrame in
+    // hidden tabs, so gating on IntersectionObserver/visibilitychange bought
+    // nothing and every pause/resume risked a visible discontinuity.
+    start()
 
     container.appendChild(gl.canvas)
 
     return () => {
       stop()
-      observer.disconnect()
-      document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('resize', resize)
       if (interactive) {
         container.removeEventListener('mousemove', handleMouseMove)
