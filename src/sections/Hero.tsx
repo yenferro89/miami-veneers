@@ -9,7 +9,15 @@ export function Hero() {
   return (
     <section id="home" className="relative min-h-[100svh] w-full overflow-hidden">
       <div className="absolute inset-0">
-        <LiquidChrome baseColor={BASE_COLOR} speed={0.3} amplitude={0.4} interactive />
+        {/* interactive={false}: uMouse feeds the distortion loop and shifts the
+            whole field's phase by up to PI, so pointer motion visibly reshuffles
+            the background. Off, the field evolves on time alone. */}
+        <LiquidChrome
+          baseColor={BASE_COLOR}
+          speed={0.3}
+          amplitude={0.4}
+          interactive={false}
+        />
       </div>
 
       {/* Hero content slot — awaiting copy. */}
