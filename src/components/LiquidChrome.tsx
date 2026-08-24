@@ -129,10 +129,16 @@ export function LiquidChrome({
     // causes visible aliasing, so only back off on genuinely huge canvases.
     const MAX_PIXELS = 5_000_000
 
+    let lastW = 0
+    let lastH = 0
+
     function resize() {
       if (!container) return
       const w = container.offsetWidth
       const h = container.offsetHeight
+      if (w === lastW && h === lastH) return
+      lastW = w
+      lastH = h
       const area = Math.max(w * h, 1)
       const budgeted = Math.sqrt(MAX_PIXELS / area)
       renderer.dpr = Math.max(1, Math.min(maxDpr, budgeted))
@@ -171,10 +177,18 @@ export function LiquidChrome({
     // hidden — this shader runs every frame and is costly on phones.
     let animationId = 0
     let running = false
+    // Accumulate only the time spent running. Feeding the raw rAF timestamp
+    // straight in means that after a pause (hero scrolled offscreen, tab
+    // backgrounded) uTime jumps by the whole paused duration and the pattern
+    // snaps to a new state — seen as an intermittent flicker.
+    let elapsed = 0
+    let lastFrame = 0
 
     function update(t: number) {
       animationId = requestAnimationFrame(update)
-      program.uniforms.uTime.value = t * 0.001 * speed
+      if (lastFrame !== 0) elapsed += t - lastFrame
+      lastFrame = t
+      program.uniforms.uTime.value = elapsed * 0.001 * speed
       renderer.render({ scene: mesh })
     }
 
@@ -187,6 +201,7 @@ export function LiquidChrome({
         renderer.render({ scene: mesh })
         return
       }
+      lastFrame = 0
       animationId = requestAnimationFrame(update)
     }
 
