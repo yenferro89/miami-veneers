@@ -141,7 +141,7 @@ export function LiquidChrome({
     // measures real frame times below and steps down this ladder until the
     // GPU keeps up.
     const DPR_STEPS = [2, 1.75, 1.5, 1.25, 1, 0.85]
-    let stepIndex = DPR_STEPS.findIndex((d) => d <= Math.min(maxDpr, 1.75))
+    let stepIndex = DPR_STEPS.findIndex((d) => d <= Math.min(maxDpr, 1.5))
     if (stepIndex < 0) stepIndex = DPR_STEPS.length - 1
 
     function resize(force = false) {
@@ -215,7 +215,7 @@ export function LiquidChrome({
     function tune(dt: number) {
       if (tuned || dt <= 0 || dt > 500) return
       samples.push(dt)
-      if (samples.length < 45) return
+      if (samples.length < 24) return
       samples.sort((a, b) => a - b)
       const median = samples[Math.floor(samples.length / 2)]
       samples = []
@@ -230,7 +230,10 @@ export function LiquidChrome({
     function update(t: number) {
       animationId = requestAnimationFrame(update)
       const dt = lastFrame !== 0 ? t - lastFrame : 0
-      if (lastFrame !== 0) elapsed += dt
+      // Cap the step fed to uTime. The distortion loop is chaotic, so a long
+      // frame advances the field far enough to look like a jump rather than
+      // motion. Capping means a slow GPU animates slower, never strobes.
+      if (lastFrame !== 0) elapsed += Math.min(dt, 24)
       lastFrame = t
       tune(dt)
       program.uniforms.uTime.value = elapsed * 0.001 * speed
