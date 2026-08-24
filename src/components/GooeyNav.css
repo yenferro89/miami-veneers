@@ -1,5 +1,8 @@
 .gooey-nav-container {
   position: relative;
+  /* Own stacking context so particle repaints stay local. No `contain: paint`
+     here — particles deliberately fly outside these bounds and would clip. */
+  isolation: isolate;
 
   /* Particle palette — vintage tones so the gooey blobs read against
      the burnt-red hero. The blur+contrast filter needs light values. */
@@ -106,6 +109,8 @@
    An SVG alpha filter produces the same metaball merge with no backing. */
 .gooey-nav-container .effect.filter {
   filter: url(#gooey-nav-goo);
+  /* Promote to its own layer so the filter re-rasterises in isolation. */
+  will-change: filter, transform;
 }
 
 .gooey-nav-container .effect.filter::after {

@@ -150,7 +150,14 @@ export function GooeyNav({
   }
 
   const handleClick = (e: React.MouseEvent<HTMLLIElement>, index: number) => {
+    // Take over the anchor's default jump. Targets that don't exist yet make
+    // the browser scroll to the top of the document, which moves the hero and
+    // churns the observer that pauses its shader — visible as a flicker.
+    e.preventDefault()
     activate(e.currentTarget, index)
+
+    const target = document.querySelector(items[index].href)
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLAnchorElement>, index: number) => {

@@ -28,8 +28,16 @@ export function Navbar() {
   return (
     <header className="fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-5 sm:pt-5">
       <div className="mx-auto max-w-6xl">
-        {/* Glass pill */}
-        <div className="flex items-center justify-between gap-3 rounded-full border border-vintage/25 bg-vintage/10 px-2 py-2 shadow-[0_8px_32px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:px-3">
+        {/* Glass pill. The blurred surface is a sibling layer behind the
+            content, not its ancestor: with the GooeyNav nested inside a
+            backdrop-filter element, every particle frame forced Chrome to
+            re-read and re-blur the live WebGL canvas behind it, which flickered
+            the hero on each click. */}
+        <div className="relative isolate flex items-center justify-between gap-3 rounded-full px-2 py-2 sm:px-3">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 -z-10 rounded-full border border-vintage/25 bg-vintage/10 shadow-[0_8px_32px_rgba(0,0,0,0.28)] backdrop-blur-xl"
+          />
           {/* Circular logo */}
           <a href="#home" className="shrink-0" aria-label="Miami Veneers — home">
             <span className="grid size-11 place-items-center overflow-hidden rounded-full bg-vintage ring-1 ring-vintage/60 sm:size-12">
@@ -91,7 +99,11 @@ export function Navbar() {
             open ? 'mt-2 grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
           }`}>
           <div className="min-h-0">
-            <nav className="rounded-3xl border border-vintage/25 bg-vintage/10 p-2 backdrop-blur-xl">
+            <nav className="relative isolate rounded-3xl p-2">
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 -z-10 rounded-3xl border border-vintage/25 bg-vintage/10 backdrop-blur-xl"
+              />
               <ul>
                 {NAV_ITEMS.map((item) => (
                   <li key={item.href}>
