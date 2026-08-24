@@ -22,7 +22,7 @@ export function LiquidChrome({
   frequencyX = 3,
   frequencyY = 3,
   interactive = true,
-  contrastFloor = 0.28,
+  contrastFloor = 0.12,
   ...props
 }: LiquidChromeProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -81,9 +81,16 @@ export function LiquidChrome({
       }
 
       void main() {
-          // Single tap. The clamped divisor makes the field smooth enough that
-          // 3x3 supersampling (9x the shader cost) buys nothing visible.
-          gl_FragColor = renderImage(vUv);
+          // 3x3 supersample, as upstream. The filaments carry detail finer than
+          // one pixel, so without this they alias into crawling broken lines.
+          vec4 col = vec4(0.0);
+          for (int i = -1; i <= 1; i++){
+              for (int j = -1; j <= 1; j++){
+                  vec2 offset = vec2(float(i), float(j)) * (1.0 / min(uResolution.x, uResolution.y));
+                  col += renderImage(vUv + offset);
+              }
+          }
+          gl_FragColor = col / 9.0;
       }
     `
 
@@ -112,7 +119,7 @@ export function LiquidChrome({
 
     // Cap the drawing buffer. This shader runs a 10-iteration loop per pixel,
     // so cost scales directly with pixel count.
-    const MAX_PIXELS = 1_100_000
+    const MAX_PIXELS = 850_000
 
     function resize() {
       if (!container) return
@@ -179,6 +186,9 @@ export function LiquidChrome({
       running = false
       cancelAnimationFrame(animationId)
     }
+
+    // Paint one frame up front so the canvas is never blank while paused.
+    renderer.render({ scene: mesh })
 
     const observer = new IntersectionObserver(
       ([entry]) => (entry.isIntersecting && !document.hidden ? start() : stop()),
