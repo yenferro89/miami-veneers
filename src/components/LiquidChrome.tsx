@@ -11,8 +11,8 @@ type LiquidChromeProps = {
   frequencyX?: number
   frequencyY?: number
   interactive?: boolean
-  /** Lower = brighter, harsher highlights. Guards against strobing. */
-  contrastFloor?: number
+  /** Overall brightness before tone mapping. Higher = brighter mids. */
+  exposure?: number
 } & Omit<ComponentPropsWithoutRef<'div'>, 'color'>
 
 export function LiquidChrome({
@@ -22,7 +22,7 @@ export function LiquidChrome({
   frequencyX = 3,
   frequencyY = 3,
   interactive = true,
-  contrastFloor = 0.12,
+  exposure = 1,
   ...props
 }: LiquidChromeProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -60,7 +60,7 @@ export function LiquidChrome({
       uniform float uFrequencyX;
       uniform float uFrequencyY;
       uniform vec2 uMouse;
-      uniform float uContrastFloor;
+      uniform float uExposure;
       varying vec2 vUv;
 
       vec4 renderImage(vec2 uvCoord) {
@@ -78,11 +78,14 @@ export function LiquidChrome({
           float ripple = sin(10.0 * dist - uTime * 2.0) * 0.03;
           uv += (diff / (dist + 0.0001)) * ripple * falloff;
 
-          // The original divides by abs(sin(...)), which tends to zero and blows
-          // the highlights to pure white. Flooring the divisor keeps the liquid
-          // filaments but bounds the brightness, so the hero can't strobe.
-          float divisor = max(abs(sin(uTime - uv.y - uv.x)), uContrastFloor);
-          vec3 color = uBaseColor / divisor;
+          // uBaseColor / abs(sin(...)) exceeds 1.0 wherever abs(sin) drops below
+          // a channel's value — about 22% of the screen for this palette — so
+          // those areas clamped to flat, detail-free blocks whose moving edges
+          // read as flicker. A hard floor only relocates the flat region.
+          // Reinhard compresses the highlights instead: smooth everywhere,
+          // asymptotic to 1.0, so nothing ever clips or goes flat.
+          vec3 raw = uBaseColor * uExposure / max(abs(sin(uTime - uv.y - uv.x)), 1e-3);
+          vec3 color = raw / (1.0 + raw);
           return vec4(color, 1.0);
       }
 
@@ -120,7 +123,7 @@ export function LiquidChrome({
         uFrequencyX: { value: frequencyX },
         uFrequencyY: { value: frequencyY },
         uMouse: { value: new Float32Array([0, 0]) },
-        uContrastFloor: { value: contrastFloor },
+        uExposure: { value: exposure },
       },
     })
     const mesh = new Mesh(gl, { geometry, program })
@@ -228,15 +231,6 @@ export function LiquidChrome({
 
     container.appendChild(gl.canvas)
 
-    // TEMP diagnostic handle — removed once the flicker source is confirmed.
-    ;(window as unknown as Record<string, unknown>).__lc = {
-      canvasCount: () => document.querySelectorAll('.liquidChrome-container canvas').length,
-      interactive,
-      mouse: () => Array.from(program.uniforms.uMouse.value as Float32Array),
-      time: () => program.uniforms.uTime.value,
-      dpr: () => renderer.dpr,
-      buffer: () => [gl.canvas.width, gl.canvas.height],
-    }
 
     return () => {
       stop()
@@ -248,7 +242,7 @@ export function LiquidChrome({
       gl.canvas.parentElement?.removeChild(gl.canvas)
       gl.getExtension('WEBGL_lose_context')?.loseContext()
     }
-  }, [baseColor, speed, amplitude, frequencyX, frequencyY, interactive, contrastFloor])
+  }, [baseColor, speed, amplitude, frequencyX, frequencyY, interactive, exposure])
 
   return <div ref={containerRef} className="liquidChrome-container" {...props} />
 }
