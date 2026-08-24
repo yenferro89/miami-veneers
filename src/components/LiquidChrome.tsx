@@ -37,9 +37,19 @@ export function LiquidChrome({
     const maxDpr = Math.min(window.devicePixelRatio || 1, 2)
     const superSample = maxDpr >= 1.5 ? 1 : 3
 
-    const renderer = new Renderer({ antialias: true, dpr: maxDpr })
+    // antialias: false — MSAA multiplies framebuffer memory (roughly 4x) on a
+    // buffer this large, and it is redundant: the shader does its own sampling
+    // and its output is smooth. The extra allocation risks GPU memory pressure
+    // and context loss.
+    const renderer = new Renderer({ antialias: false, dpr: maxDpr })
     const gl = renderer.gl
-    gl.clearColor(1, 1, 1, 1)
+
+    // Clear to the base colour, not white. The mesh covers the viewport so the
+    // clear is normally invisible, but any frame that presents the clear
+    // without the draw — buffer reallocation, a dropped frame, context
+    // recovery — flashes that colour. Upstream clears to white, which on a dark
+    // page is a bright strobe. Clearing to the base colour makes it invisible.
+    gl.clearColor(baseColor[0], baseColor[1], baseColor[2], 1)
 
     const vertexShader = `
       attribute vec2 position;
@@ -130,7 +140,7 @@ export function LiquidChrome({
 
     // Budget in real device pixels. Dropping below native density is what
     // causes visible aliasing, so only back off on genuinely huge canvases.
-    const MAX_PIXELS = 5_000_000
+    const MAX_PIXELS = 2_600_000
 
     let lastW = 0
     let lastH = 0
@@ -141,7 +151,7 @@ export function LiquidChrome({
     // measures real frame times below and steps down this ladder until the
     // GPU keeps up.
     const DPR_STEPS = [2, 1.75, 1.5, 1.25, 1, 0.85]
-    let stepIndex = DPR_STEPS.findIndex((d) => d <= Math.min(maxDpr, 1.5))
+    let stepIndex = DPR_STEPS.findIndex((d) => d <= Math.min(maxDpr, 1.25))
     if (stepIndex < 0) stepIndex = DPR_STEPS.length - 1
 
     function resize(force = false) {
@@ -269,12 +279,29 @@ export function LiquidChrome({
     // nothing and every pause/resume risked a visible discontinuity.
     start()
 
+    // A lost context renders blank frames until it is restored, which looks
+    // like flashing. Surface it and re-establish size on recovery.
+    function handleContextLost(e: Event) {
+      e.preventDefault()
+      console.warn('[LiquidChrome] WebGL context lost')
+      stop()
+    }
+    function handleContextRestored() {
+      console.warn('[LiquidChrome] WebGL context restored')
+      resize(true)
+      start()
+    }
+    gl.canvas.addEventListener('webglcontextlost', handleContextLost)
+    gl.canvas.addEventListener('webglcontextrestored', handleContextRestored)
+
     container.appendChild(gl.canvas)
 
 
     return () => {
       stop()
       window.removeEventListener('resize', handleResize)
+      gl.canvas.removeEventListener('webglcontextlost', handleContextLost)
+      gl.canvas.removeEventListener('webglcontextrestored', handleContextRestored)
       if (interactive) {
         window.removeEventListener('mousemove', handleMouseMove)
         window.removeEventListener('touchmove', handleTouchMove)
