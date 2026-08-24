@@ -228,6 +228,16 @@ export function LiquidChrome({
 
     container.appendChild(gl.canvas)
 
+    // TEMP diagnostic handle — removed once the flicker source is confirmed.
+    ;(window as unknown as Record<string, unknown>).__lc = {
+      canvasCount: () => document.querySelectorAll('.liquidChrome-container canvas').length,
+      interactive,
+      mouse: () => Array.from(program.uniforms.uMouse.value as Float32Array),
+      time: () => program.uniforms.uTime.value,
+      dpr: () => renderer.dpr,
+      buffer: () => [gl.canvas.width, gl.canvas.height],
+    }
+
     return () => {
       stop()
       window.removeEventListener('resize', resize)

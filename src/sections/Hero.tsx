@@ -8,7 +8,7 @@ const BASE_COLOR: [number, number, number] = [
 export function Hero() {
   return (
     <section id="home" className="relative min-h-[100svh] w-full overflow-hidden">
-      <div className="absolute inset-0">
+      <div className="pointer-events-none absolute inset-0">
         {/* interactive={false}: uMouse feeds the distortion loop and shifts the
             whole field's phase by up to PI, so pointer motion visibly reshuffles
             the background. Off, the field evolves on time alone. */}
