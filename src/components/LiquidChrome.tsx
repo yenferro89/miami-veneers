@@ -135,23 +135,33 @@ export function LiquidChrome({
     let lastW = 0
     let lastH = 0
 
-    function resize() {
+    // Resolution ladder. This shader costs ~10 loop iterations per pixel, so a
+    // full-screen hero at native retina is roughly 4x the pixels of the
+    // upstream demo box. Rather than guess a fixed density, the render loop
+    // measures real frame times below and steps down this ladder until the
+    // GPU keeps up.
+    const DPR_STEPS = [2, 1.75, 1.5, 1.25, 1, 0.85]
+    let stepIndex = DPR_STEPS.findIndex((d) => d <= Math.min(maxDpr, 1.75))
+    if (stepIndex < 0) stepIndex = DPR_STEPS.length - 1
+
+    function resize(force = false) {
       if (!container) return
       const w = container.offsetWidth
       const h = container.offsetHeight
-      if (w === lastW && h === lastH) return
+      if (!force && w === lastW && h === lastH) return
       lastW = w
       lastH = h
       const area = Math.max(w * h, 1)
       const budgeted = Math.sqrt(MAX_PIXELS / area)
-      renderer.dpr = Math.max(1, Math.min(maxDpr, budgeted))
+      renderer.dpr = Math.max(0.85, Math.min(DPR_STEPS[stepIndex], budgeted))
       renderer.setSize(w, h)
       const res = program.uniforms.uResolution.value as Float32Array
       res[0] = gl.canvas.width
       res[1] = gl.canvas.height
       res[2] = gl.canvas.width / gl.canvas.height
     }
-    window.addEventListener('resize', resize)
+    const handleResize = () => resize()
+    window.addEventListener('resize', handleResize)
     resize()
 
     // uMouse feeds the distortion loop, not just the ripple, shifting the whole
@@ -197,10 +207,32 @@ export function LiquidChrome({
     let elapsed = 0
     let lastFrame = 0
 
+    // Frame-time sampling: step the resolution down until we hold ~60fps.
+    const TARGET_MS = 20
+    let samples: number[] = []
+    let tuned = false
+
+    function tune(dt: number) {
+      if (tuned || dt <= 0 || dt > 500) return
+      samples.push(dt)
+      if (samples.length < 45) return
+      samples.sort((a, b) => a - b)
+      const median = samples[Math.floor(samples.length / 2)]
+      samples = []
+      if (median > TARGET_MS && stepIndex < DPR_STEPS.length - 1) {
+        stepIndex++
+        resize(true)
+      } else {
+        tuned = true
+      }
+    }
+
     function update(t: number) {
       animationId = requestAnimationFrame(update)
-      if (lastFrame !== 0) elapsed += t - lastFrame
+      const dt = lastFrame !== 0 ? t - lastFrame : 0
+      if (lastFrame !== 0) elapsed += dt
       lastFrame = t
+      tune(dt)
       program.uniforms.uTime.value = elapsed * 0.001 * speed
 
       const mouse = program.uniforms.uMouse.value as Float32Array
@@ -239,7 +271,7 @@ export function LiquidChrome({
 
     return () => {
       stop()
-      window.removeEventListener('resize', resize)
+      window.removeEventListener('resize', handleResize)
       if (interactive) {
         window.removeEventListener('mousemove', handleMouseMove)
         window.removeEventListener('touchmove', handleTouchMove)
