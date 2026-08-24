@@ -1,1 +1,26 @@
 @import "tailwindcss";
+
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+
+@theme {
+  /* Brand palette */
+  --color-burnt: #570010;
+  --color-vintage: #dad9d2;
+
+  /* Type */
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Times New Roman", Times, serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-burnt);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
