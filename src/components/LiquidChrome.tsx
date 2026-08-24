@@ -176,9 +176,14 @@ export function LiquidChrome({
       if (touch) setMouseFromPoint(touch.clientX, touch.clientY)
     }
 
+    // Listen on window rather than the container. Upstream binds to the
+    // container, so the uniform freezes while the cursor is over the nav and
+    // then jumps when it re-enters — a discontinuity in the field. Window-level
+    // tracking stays continuous, and needs no hit-testing, so the background
+    // can keep pointer-events: none.
     if (interactive) {
-      container.addEventListener('mousemove', handleMouseMove)
-      container.addEventListener('touchmove', handleTouchMove)
+      window.addEventListener('mousemove', handleMouseMove)
+      window.addEventListener('touchmove', handleTouchMove)
     }
 
     // Pause the render loop when the hero scrolls out of view or the tab is
@@ -236,8 +241,8 @@ export function LiquidChrome({
       stop()
       window.removeEventListener('resize', resize)
       if (interactive) {
-        container.removeEventListener('mousemove', handleMouseMove)
-        container.removeEventListener('touchmove', handleTouchMove)
+        window.removeEventListener('mousemove', handleMouseMove)
+        window.removeEventListener('touchmove', handleTouchMove)
       }
       gl.canvas.parentElement?.removeChild(gl.canvas)
       gl.getExtension('WEBGL_lose_context')?.loseContext()
