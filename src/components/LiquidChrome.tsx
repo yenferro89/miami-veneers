@@ -11,6 +11,8 @@ type LiquidChromeProps = {
   frequencyX?: number
   frequencyY?: number
   interactive?: boolean
+  /** Lower = brighter, harsher highlights. Guards against strobing. */
+  contrastFloor?: number
 } & Omit<ComponentPropsWithoutRef<'div'>, 'color'>
 
 export function LiquidChrome({
@@ -20,6 +22,7 @@ export function LiquidChrome({
   frequencyX = 3,
   frequencyY = 3,
   interactive = true,
+  contrastFloor = 0.28,
   ...props
 }: LiquidChromeProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -51,6 +54,7 @@ export function LiquidChrome({
       uniform float uFrequencyX;
       uniform float uFrequencyY;
       uniform vec2 uMouse;
+      uniform float uContrastFloor;
       varying vec2 vUv;
 
       vec4 renderImage(vec2 uvCoord) {
@@ -68,21 +72,18 @@ export function LiquidChrome({
           float ripple = sin(10.0 * dist - uTime * 2.0) * 0.03;
           uv += (diff / (dist + 0.0001)) * ripple * falloff;
 
-          vec3 color = uBaseColor / abs(sin(uTime - uv.y - uv.x));
+          // The original divides by abs(sin(...)), which tends to zero and blows
+          // the highlights to pure white. Flooring the divisor keeps the liquid
+          // filaments but bounds the brightness, so the hero can't strobe.
+          float divisor = max(abs(sin(uTime - uv.y - uv.x)), uContrastFloor);
+          vec3 color = uBaseColor / divisor;
           return vec4(color, 1.0);
       }
 
       void main() {
-          vec4 col = vec4(0.0);
-          int samples = 0;
-          for (int i = -1; i <= 1; i++){
-              for (int j = -1; j <= 1; j++){
-                  vec2 offset = vec2(float(i), float(j)) * (1.0 / min(uResolution.x, uResolution.y));
-                  col += renderImage(vUv + offset);
-                  samples++;
-              }
-          }
-          gl_FragColor = col / float(samples);
+          // Single tap. The clamped divisor makes the field smooth enough that
+          // 3x3 supersampling (9x the shader cost) buys nothing visible.
+          gl_FragColor = renderImage(vUv);
       }
     `
 
@@ -104,13 +105,22 @@ export function LiquidChrome({
         uFrequencyX: { value: frequencyX },
         uFrequencyY: { value: frequencyY },
         uMouse: { value: new Float32Array([0, 0]) },
+        uContrastFloor: { value: contrastFloor },
       },
     })
     const mesh = new Mesh(gl, { geometry, program })
 
+    // Cap the drawing buffer. This shader runs a 10-iteration loop per pixel,
+    // so cost scales directly with pixel count.
+    const MAX_PIXELS = 1_100_000
+
     function resize() {
       if (!container) return
-      renderer.setSize(container.offsetWidth, container.offsetHeight)
+      const w = container.offsetWidth
+      const h = container.offsetHeight
+      const scale = Math.min(1, Math.sqrt(MAX_PIXELS / Math.max(w * h, 1)))
+      renderer.dpr = scale
+      renderer.setSize(w, h)
       const res = program.uniforms.uResolution.value as Float32Array
       res[0] = gl.canvas.width
       res[1] = gl.canvas.height
@@ -152,9 +162,15 @@ export function LiquidChrome({
       renderer.render({ scene: mesh })
     }
 
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
     function start() {
       if (running) return
       running = true
+      if (reduceMotion) {
+        renderer.render({ scene: mesh })
+        return
+      }
       animationId = requestAnimationFrame(update)
     }
 
@@ -190,7 +206,7 @@ export function LiquidChrome({
       gl.canvas.parentElement?.removeChild(gl.canvas)
       gl.getExtension('WEBGL_lose_context')?.loseContext()
     }
-  }, [baseColor, speed, amplitude, frequencyX, frequencyY, interactive])
+  }, [baseColor, speed, amplitude, frequencyX, frequencyY, interactive, contrastFloor])
 
   return <div ref={containerRef} className="liquidChrome-container" {...props} />
 }

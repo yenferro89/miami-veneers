@@ -194,6 +194,21 @@ export function GooeyNav({
           ))}
         </ul>
       </nav>
+      {/* Alpha-channel goo: blur, then push alpha through a steep ramp so
+          nearby blobs fuse. Works over transparency, unlike blur+contrast. */}
+      <svg aria-hidden="true" focusable="false" width="0" height="0"
+        style={{ position: 'absolute' }}>
+        <defs>
+          <filter id="gooey-nav-goo">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" />
+            <feColorMatrix
+              in="blur"
+              type="matrix"
+              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -8"
+            />
+          </filter>
+        </defs>
+      </svg>
       <span className="effect filter" ref={filterRef} />
       <span className="effect text" ref={textRef} />
     </div>
