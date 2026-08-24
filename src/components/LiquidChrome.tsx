@@ -31,7 +31,13 @@ export function LiquidChrome({
     const container = containerRef.current
     if (!container) return
 
-    const renderer = new Renderer({ antialias: true })
+    // Render at the screen's real pixel density. Supersampling a low-res
+    // buffer and upscaling it shatters the thin filaments into broken lines;
+    // one tap at native density is both sharper AND cheaper than 9 taps at 1x.
+    const maxDpr = Math.min(window.devicePixelRatio || 1, 2)
+    const superSample = maxDpr >= 1.5 ? 1 : 3
+
+    const renderer = new Renderer({ antialias: true, dpr: maxDpr })
     const gl = renderer.gl
     gl.clearColor(1, 1, 1, 1)
 
@@ -81,16 +87,18 @@ export function LiquidChrome({
       }
 
       void main() {
-          // 3x3 supersample, as upstream. The filaments carry detail finer than
-          // one pixel, so without this they alias into crawling broken lines.
-          vec4 col = vec4(0.0);
+          ${
+            superSample === 1
+              ? 'gl_FragColor = renderImage(vUv);'
+              : `vec4 col = vec4(0.0);
           for (int i = -1; i <= 1; i++){
               for (int j = -1; j <= 1; j++){
                   vec2 offset = vec2(float(i), float(j)) * (1.0 / min(uResolution.x, uResolution.y));
                   col += renderImage(vUv + offset);
               }
           }
-          gl_FragColor = col / 9.0;
+          gl_FragColor = col / 9.0;`
+          }
       }
     `
 
@@ -117,16 +125,17 @@ export function LiquidChrome({
     })
     const mesh = new Mesh(gl, { geometry, program })
 
-    // Cap the drawing buffer. This shader runs a 10-iteration loop per pixel,
-    // so cost scales directly with pixel count.
-    const MAX_PIXELS = 850_000
+    // Budget in real device pixels. Dropping below native density is what
+    // causes visible aliasing, so only back off on genuinely huge canvases.
+    const MAX_PIXELS = 5_000_000
 
     function resize() {
       if (!container) return
       const w = container.offsetWidth
       const h = container.offsetHeight
-      const scale = Math.min(1, Math.sqrt(MAX_PIXELS / Math.max(w * h, 1)))
-      renderer.dpr = scale
+      const area = Math.max(w * h, 1)
+      const budgeted = Math.sqrt(MAX_PIXELS / area)
+      renderer.dpr = Math.max(1, Math.min(maxDpr, budgeted))
       renderer.setSize(w, h)
       const res = program.uniforms.uResolution.value as Float32Array
       res[0] = gl.canvas.width
