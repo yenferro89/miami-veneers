@@ -32,7 +32,11 @@ export const LiquidChrome = ({
     if (!containerRef.current) return
 
     const container = containerRef.current
-    const renderer = new Renderer({ antialias: true })
+    // Only change to upstream: render at the display's pixel density.
+    // Upstream renders at dpr 1, so on a Retina screen the shader's sub-pixel
+    // filaments are sampled at half the display resolution and alias into
+    // broken shards — the "stripes".
+    const renderer = new Renderer({ antialias: true, dpr: window.devicePixelRatio || 1 })
     const gl = renderer.gl
     // Upstream clears to white. That is invisible while the mesh draws, but
     // any failure — context creation, context loss, a dropped frame — then
