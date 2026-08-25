@@ -1,103 +1,93 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import LiquidChrome from './components/LiquidChrome'
 
-type Diag = Record<string, string>
+const SIZES = [
+  { label: '400px', height: '400px' },
+  { label: '600px (docs)', height: '600px' },
+  { label: 'Full viewport', height: '100vh' },
+]
 
-function probe(): Diag {
-  const out: Diag = {}
-  out['devicePixelRatio'] = String(window.devicePixelRatio)
-  out['viewport'] = `${window.innerWidth} x ${window.innerHeight}`
+function Fps() {
+  const [fps, setFps] = useState(0)
+  const frames = useRef(0)
+  const t0 = useRef(performance.now())
 
-  let gl: WebGLRenderingContext | null = null
-  try {
-    const c = document.createElement('canvas')
-    gl = (c.getContext('webgl') ||
-      c.getContext('experimental-webgl')) as WebGLRenderingContext | null
-  } catch (e) {
-    out['contextError'] = String(e)
-  }
-
-  if (!gl) {
-    out['WebGL'] = 'UNAVAILABLE — cannot create a context'
-    return out
-  }
-
-  out['WebGL'] = 'available'
-  out['contextLost'] = String(gl.isContextLost())
-  try {
-    const dbg = gl.getExtension('WEBGL_debug_renderer_info')
-    if (dbg) {
-      out['GPU vendor'] = String(gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL))
-      out['GPU renderer'] = String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL))
+  useEffect(() => {
+    let id = 0
+    const tick = () => {
+      frames.current++
+      const now = performance.now()
+      if (now - t0.current >= 500) {
+        setFps(Math.round((frames.current * 1000) / (now - t0.current)))
+        frames.current = 0
+        t0.current = now
+      }
+      id = requestAnimationFrame(tick)
     }
-  } catch {
-    /* extension unavailable */
-  }
-  out['maxTextureSize'] = String(gl.getParameter(gl.MAX_TEXTURE_SIZE))
+    id = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(id)
+  }, [])
 
-  // How many more contexts can this page create before the browser refuses?
-  const held: WebGLRenderingContext[] = []
-  for (let i = 0; i < 20; i++) {
-    const g = document.createElement('canvas').getContext('webgl')
-    if (!g || g.isContextLost()) break
-    held.push(g as WebGLRenderingContext)
-  }
-  out['spare contexts'] = `${held.length} of 20`
-  held.forEach((g) => g.getExtension('WEBGL_lose_context')?.loseContext())
-  gl.getExtension('WEBGL_lose_context')?.loseContext()
-
-  return out
+  const colour = fps >= 50 ? '#0a7' : fps >= 30 ? '#c80' : '#c00'
+  return (
+    <span style={{ color: colour, fontWeight: 700, fontSize: 22 }}>{fps} fps</span>
+  )
 }
 
 export default function App() {
-  const [diag, setDiag] = useState<Diag>({})
-  const [canvasInfo, setCanvasInfo] = useState('checking…')
+  const [size, setSize] = useState(SIZES[0])
+  const [buffer, setBuffer] = useState('')
 
   useEffect(() => {
-    setDiag(probe())
-    const t = setTimeout(() => {
-      const cv = document.querySelector('.liquidChrome-container canvas')
-      setCanvasInfo(
-        cv
-          ? `canvas present — buffer ${(cv as HTMLCanvasElement).width} x ${(cv as HTMLCanvasElement).height}`
-          : 'NO CANVAS — the component never appended one',
-      )
-    }, 1500)
-    return () => clearTimeout(t)
+    const t = setInterval(() => {
+      const cv = document.querySelector(
+        '.liquidChrome-container canvas',
+      ) as HTMLCanvasElement | null
+      setBuffer(cv ? `${cv.width} x ${cv.height} = ${(cv.width * cv.height / 1e6).toFixed(2)} MP` : 'none')
+    }, 700)
+    return () => clearInterval(t)
   }, [])
 
   return (
     <div style={{ fontFamily: 'monospace', padding: 16, color: '#111' }}>
-      <h1 style={{ fontSize: 18, margin: '0 0 12px' }}>LiquidChrome diagnostics</h1>
-      <table style={{ borderCollapse: 'collapse', fontSize: 13, marginBottom: 8 }}>
-        <tbody>
-          {Object.entries(diag).map(([k, v]) => (
-            <tr key={k}>
-              <td style={{ padding: '3px 14px 3px 0', color: '#666' }}>{k}</td>
-              <td style={{ padding: '3px 0', fontWeight: 700 }}>{v}</td>
-            </tr>
-          ))}
-          <tr>
-            <td style={{ padding: '3px 14px 3px 0', color: '#666' }}>canvas</td>
-            <td style={{ padding: '3px 0', fontWeight: 700 }}>{canvasInfo}</td>
-          </tr>
-        </tbody>
-      </table>
+      <h1 style={{ fontSize: 17, margin: '0 0 10px' }}>
+        Frame-rate test — Intel Iris Plus 640
+      </h1>
 
-      <p style={{ fontSize: 12, color: '#666', margin: '0 0 8px' }}>
-        Below is the component, in a 400px box. If this area is blank/white, WebGL
-        is failing on this machine — the numbers above say why.
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+        {SIZES.map((s) => (
+          <button
+            key={s.label}
+            onClick={() => setSize(s)}
+            style={{
+              padding: '7px 12px',
+              fontFamily: 'monospace',
+              fontSize: 13,
+              cursor: 'pointer',
+              border: '2px solid #570010',
+              background: size.label === s.label ? '#570010' : '#fff',
+              color: size.label === s.label ? '#fff' : '#570010',
+            }}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ marginBottom: 10, fontSize: 13 }}>
+        <Fps />
+        <span style={{ color: '#666', marginLeft: 14 }}>buffer {buffer}</span>
+      </div>
+
+      <p style={{ fontSize: 12, color: '#666', margin: '0 0 8px', maxWidth: 640 }}>
+        Click each size and note the fps. Green = smooth, amber = borderline, red
+        = the animation is stepping and will look like flashing. This tells us the
+        largest size this shader can hold on this GPU.
       </p>
 
-      <div
-        style={{
-          width: '100%',
-          height: '400px',
-          position: 'relative',
-          outline: '2px solid #570010',
-        }}
-      >
+      <div style={{ width: '100%', height: size.height, position: 'relative', outline: '2px solid #570010' }}>
         <LiquidChrome
+          key={size.label}
           baseColor={[0.1, 0.1, 0.1]}
           speed={0.3}
           amplitude={0.3}
