@@ -34,7 +34,11 @@ export const LiquidChrome = ({
     const container = containerRef.current
     const renderer = new Renderer({ antialias: true })
     const gl = renderer.gl
-    gl.clearColor(1, 1, 1, 1)
+    // Upstream clears to white. That is invisible while the mesh draws, but
+    // any failure — context creation, context loss, a dropped frame — then
+    // shows as a full white screen. Clear to the base colour so a failure
+    // degrades to a flat brand-coloured panel instead.
+    gl.clearColor(baseColor[0], baseColor[1], baseColor[2], 1)
 
     const vertexShader = `
       attribute vec2 position;
