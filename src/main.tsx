@@ -1,4 +1,3 @@
-import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
@@ -11,8 +10,9 @@ console.info(
 )
 ;(window as unknown as Record<string, unknown>).__build = __BUILD_ID__
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+// No StrictMode. It double-invokes effects in development, and LiquidChrome
+// creates a WebGL context per effect run. Combined with HMR remounting on
+// every save, that exhausts the browser's context limit (~16) until context
+// creation fails outright — a white canvas showing only the clear colour.
+// react-bits does not use StrictMode on its own site either.
+createRoot(document.getElementById('root')!).render(<App />)
