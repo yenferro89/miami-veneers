@@ -1,6 +1,8 @@
-// Verbatim port of the react-bits LiquidChrome component. Typed for this
-// project, but the logic is unchanged from upstream — do not "improve" it
-// without a measured reason.
+// Port of the react-bits LiquidChrome component, typed for this project.
+// The only change to upstream logic is a dither in main() — see the comment
+// there. Do not "improve" anything else without a measured reason; several
+// earlier attempts (resolution caps, render pausing, context-loss handling)
+// each introduced worse defects than they fixed.
 import { useRef, useEffect } from 'react'
 import type { ComponentPropsWithoutRef } from 'react'
 import { Renderer, Program, Mesh, Triangle } from 'ogl'
@@ -75,6 +77,14 @@ export const LiquidChrome = ({
           return vec4(color, 1.0);
       }
 
+      // ONLY deviation from the upstream source. An 8-bit channel cannot
+      // represent a smooth dark gradient: neighbouring values quantise to the
+      // same byte until they step, drawing visible contour bands across the
+      // dark areas. Sub-LSB noise breaks the contours without visible grain.
+      float dither(vec2 p) {
+          return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+      }
+
       void main() {
           vec4 col = vec4(0.0);
           int samples = 0;
@@ -85,7 +95,8 @@ export const LiquidChrome = ({
                   samples++;
               }
           }
-          gl_FragColor = col / float(samples);
+          col /= float(samples);
+          gl_FragColor = vec4(col.rgb + (dither(gl_FragCoord.xy) - 0.5) / 255.0, 1.0);
       }
     `
 
