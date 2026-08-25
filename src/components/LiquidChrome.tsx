@@ -31,11 +31,13 @@ export function LiquidChrome({
     const container = containerRef.current
     if (!container) return
 
-    // Render at the screen's real pixel density. Supersampling a low-res
-    // buffer and upscaling it shatters the thin filaments into broken lines;
-    // one tap at native density is both sharper AND cheaper than 9 taps at 1x.
+    // Density drives sharpness: supersampling a low-res buffer then upscaling
+    // shatters the thin filaments into broken lines, while one tap at high
+    // density is both sharper and cheaper than nine taps at 1x. Key the tap
+    // count off the density we actually start at, not the display's maximum.
     const maxDpr = Math.min(window.devicePixelRatio || 1, 2)
-    const superSample = maxDpr >= 1.5 ? 1 : 3
+    const startDpr = Math.min(maxDpr, 1.25)
+    const superSample = startDpr >= 1.25 ? 1 : 3
 
     // antialias: false — MSAA multiplies framebuffer memory (roughly 4x) on a
     // buffer this large, and it is redundant: the shader does its own sampling
@@ -151,7 +153,7 @@ export function LiquidChrome({
     // measures real frame times below and steps down this ladder until the
     // GPU keeps up.
     const DPR_STEPS = [2, 1.75, 1.5, 1.25, 1, 0.85]
-    let stepIndex = DPR_STEPS.findIndex((d) => d <= Math.min(maxDpr, 1.25))
+    let stepIndex = DPR_STEPS.findIndex((d) => d <= startDpr)
     if (stepIndex < 0) stepIndex = DPR_STEPS.length - 1
 
     function resize(force = false) {
@@ -206,14 +208,11 @@ export function LiquidChrome({
       window.addEventListener('touchmove', handleTouchMove)
     }
 
-    // Pause the render loop when the hero scrolls out of view or the tab is
-    // hidden — this shader runs every frame and is costly on phones.
     let animationId = 0
     let running = false
-    // Accumulate only the time spent running. Feeding the raw rAF timestamp
-    // straight in means that after a pause (hero scrolled offscreen, tab
-    // backgrounded) uTime jumps by the whole paused duration and the pattern
-    // snaps to a new state — seen as an intermittent flicker.
+    // Accumulate rendered time rather than reading the raw rAF timestamp, so
+    // that a stop/start (context loss and recovery) resumes where it left off
+    // instead of jumping the field forward by the whole gap.
     let elapsed = 0
     let lastFrame = 0
 
@@ -274,9 +273,9 @@ export function LiquidChrome({
       cancelAnimationFrame(animationId)
     }
 
-    // No manual pausing. Browsers already throttle requestAnimationFrame in
-    // hidden tabs, so gating on IntersectionObserver/visibilitychange bought
-    // nothing and every pause/resume risked a visible discontinuity.
+    // Started unconditionally. Browsers already throttle rAF in hidden tabs,
+    // so gating on IntersectionObserver/visibilitychange bought nothing while
+    // every pause/resume risked a visible discontinuity.
     start()
 
     // A lost context renders blank frames until it is restored, which looks
@@ -295,7 +294,6 @@ export function LiquidChrome({
     gl.canvas.addEventListener('webglcontextrestored', handleContextRestored)
 
     container.appendChild(gl.canvas)
-
 
     return () => {
       stop()

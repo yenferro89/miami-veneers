@@ -14,10 +14,9 @@ const BASE_COLOR: [number, number, number] = [
 export function Hero() {
   return (
     <section id="home" className="relative min-h-[100svh] w-full overflow-hidden">
+      {/* pointer-events: none — LiquidChrome tracks the pointer on window, so
+          the background never needs to be hit-testable. */}
       <div className="pointer-events-none absolute inset-0">
-        {/* uMouse feeds the distortion loop, shifting the field's phase by up
-            to PI, so the component damps pointer input rather than applying it
-            raw as upstream does. */}
         <LiquidChrome baseColor={BASE_COLOR} speed={0.3} amplitude={0.3} interactive />
       </div>
 
