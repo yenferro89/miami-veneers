@@ -36,6 +36,7 @@ function Fps() {
 
 export default function App() {
   const [size, setSize] = useState(SIZES[0])
+  const [dpr, setDpr] = useState(1)
   const [buffer, setBuffer] = useState('')
 
   useEffect(() => {
@@ -74,20 +75,41 @@ export default function App() {
         ))}
       </div>
 
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        {[1, 2].map((d) => (
+          <button
+            key={d}
+            onClick={() => setDpr(d)}
+            style={{
+              padding: '7px 12px',
+              fontFamily: 'monospace',
+              fontSize: 13,
+              cursor: 'pointer',
+              border: '2px solid #17607a',
+              background: dpr === d ? '#17607a' : '#fff',
+              color: dpr === d ? '#fff' : '#17607a',
+            }}
+          >
+            dpr {d}{d === 2 ? ' (retina — sharp)' : ' (upstream — aliased)'}
+          </button>
+        ))}
+      </div>
+
       <div style={{ marginBottom: 10, fontSize: 13 }}>
         <Fps />
         <span style={{ color: '#666', marginLeft: 14 }}>buffer {buffer}</span>
       </div>
 
       <p style={{ fontSize: 12, color: '#666', margin: '0 0 8px', maxWidth: 640 }}>
-        Click each size and note the fps. Green = smooth, amber = borderline, red
+        Try dpr 2 — that is the sharpness fix. Then check the fps at each size. Green = smooth, amber = borderline, red
         = the animation is stepping and will look like flashing. This tells us the
         largest size this shader can hold on this GPU.
       </p>
 
       <div style={{ width: '100%', height: size.height, position: 'relative', outline: '2px solid #570010' }}>
         <LiquidChrome
-          key={size.label}
+          key={`${size.label}-${dpr}`}
+          dpr={dpr}
           baseColor={[0.1, 0.1, 0.1]}
           speed={0.3}
           amplitude={0.3}

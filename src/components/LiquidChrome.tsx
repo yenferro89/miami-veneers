@@ -9,6 +9,8 @@ import { Renderer, Program, Mesh, Triangle } from 'ogl'
 import './LiquidChrome.css'
 
 type LiquidChromeProps = {
+  /** Test harness only: render density. Upstream is effectively 1. */
+  dpr?: number
   baseColor?: [number, number, number]
   speed?: number
   amplitude?: number
@@ -18,6 +20,7 @@ type LiquidChromeProps = {
 } & Omit<ComponentPropsWithoutRef<'div'>, 'color'>
 
 export const LiquidChrome = ({
+  dpr = 1,
   baseColor = [0.1, 0.1, 0.1],
   speed = 0.2,
   amplitude = 0.3,
@@ -32,7 +35,7 @@ export const LiquidChrome = ({
     if (!containerRef.current) return
 
     const container = containerRef.current
-    const renderer = new Renderer({ antialias: true })
+    const renderer = new Renderer({ antialias: true, dpr })
     const gl = renderer.gl
     gl.clearColor(1, 1, 1, 1)
 
@@ -171,7 +174,7 @@ export const LiquidChrome = ({
       }
       gl.getExtension('WEBGL_lose_context')?.loseContext()
     }
-  }, [baseColor, speed, amplitude, frequencyX, frequencyY, interactive])
+  }, [dpr, baseColor, speed, amplitude, frequencyX, frequencyY, interactive])
 
   return <div ref={containerRef} className="liquidChrome-container" {...props} />
 }
