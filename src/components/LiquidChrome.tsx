@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import type { ComponentPropsWithoutRef } from 'react'
 import { Renderer, Program, Mesh, Triangle } from 'ogl'
 
@@ -26,6 +26,8 @@ export function LiquidChrome({
   ...props
 }: LiquidChromeProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  // Bumped when the WebGL context is lost, to rebuild everything from scratch.
+  const [generation, setGeneration] = useState(0)
 
   useEffect(() => {
     const container = containerRef.current
@@ -222,7 +224,14 @@ export function LiquidChrome({
     let tuned = false
 
     function tune(dt: number) {
-      if (tuned || dt <= 0 || dt > 500) return
+      if (tuned || dt <= 0) return
+      // A long gap means the tab was backgrounded, not that the GPU is slow.
+      // Discard what we had so resume noise can't trigger a resolution drop
+      // (each drop reallocates the drawing buffer, which itself flashes).
+      if (dt > 200) {
+        samples = []
+        return
+      }
       samples.push(dt)
       if (samples.length < 24) return
       samples.sort((a, b) => a - b)
@@ -278,17 +287,18 @@ export function LiquidChrome({
     // every pause/resume risked a visible discontinuity.
     start()
 
-    // A lost context renders blank frames until it is restored, which looks
-    // like flashing. Surface it and re-establish size on recovery.
+    // Backgrounding the window lets the GPU reclaim the context. A restored
+    // context invalidates every resource created on the old one — program,
+    // buffers, geometry — so resuming the loop would render through a dead
+    // program and produce garbage. Rebuild the whole effect instead.
     function handleContextLost(e: Event) {
       e.preventDefault()
-      console.warn('[LiquidChrome] WebGL context lost')
       stop()
+      console.warn('[LiquidChrome] WebGL context lost — rebuilding on restore')
     }
     function handleContextRestored() {
-      console.warn('[LiquidChrome] WebGL context restored')
-      resize(true)
-      start()
+      console.warn('[LiquidChrome] WebGL context restored — rebuilding')
+      setGeneration((g) => g + 1)
     }
     gl.canvas.addEventListener('webglcontextlost', handleContextLost)
     gl.canvas.addEventListener('webglcontextrestored', handleContextRestored)
@@ -307,7 +317,7 @@ export function LiquidChrome({
       gl.canvas.parentElement?.removeChild(gl.canvas)
       gl.getExtension('WEBGL_lose_context')?.loseContext()
     }
-  }, [baseColor, speed, amplitude, frequencyX, frequencyY, interactive, exposure])
+  }, [baseColor, speed, amplitude, frequencyX, frequencyY, interactive, exposure, generation])
 
   return <div ref={containerRef} className="liquidChrome-container" {...props} />
 }
