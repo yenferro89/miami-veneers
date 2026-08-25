@@ -9,7 +9,7 @@ export function Hero() {
   return (
     <section id="home" className="relative min-h-[100svh] w-full overflow-hidden">
       <div className="absolute inset-0">
-        <LiquidChrome baseColor={BASE_COLOR} speed={0.3} amplitude={0.4} interactive />
+        <LiquidChrome baseColor={BASE_COLOR} speed={0.2} amplitude={0.2} interactive />
       </div>
 
       {/* Hero content slot — awaiting copy. */}
